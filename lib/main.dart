@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-// steg1
-// UI
+
+// Steg 2: tillstånd + funktionalitet (add / toggle / delete / filter)
 void main() {
   runApp(const Tig333TodoApp());
 }
@@ -23,88 +23,145 @@ class Tig333TodoApp extends StatelessWidget {
   }
 }
 
-class TodoListScreen extends StatelessWidget {
+class Todo {
+  String title;
+  bool done;
+  Todo(this.title, {this.done = false});
+}
+
+enum TodoFilter { all, done, undone }
+
+class TodoListScreen extends StatefulWidget {
   const TodoListScreen({super.key});
 
   @override
+  State<TodoListScreen> createState() => _TodoListScreenState();
+}
+
+class _TodoListScreenState extends State<TodoListScreen> {
+  final _controller = TextEditingController();
+  final List<Todo> _todos = [
+    Todo('Write a book'),
+    Todo('Do homework'),
+    Todo('Tidy room', done: true),
+    Todo('Watch TV'),
+    Todo('Nap'),
+    Todo('Shop groceries'),
+    Todo('Have fun'),
+    Todo('Meditate'),
+  ];
+
+  TodoFilter _filter = TodoFilter.all;
+
+  List<Todo> get _filtered {
+    switch (_filter) {
+      case TodoFilter.done:
+        return _todos.where((t) => t.done).toList();
+      case TodoFilter.undone:
+        return _todos.where((t) => !t.done).toList();
+      case TodoFilter.all:
+        return _todos;
+    }
+  }
+
+  void _addTodo() {
+    final text = _controller.text.trim();
+    if (text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Write something first…')),
+      );
+      return;
+    }
+    setState(() {
+      _todos.add(Todo(text));
+    });
+    _controller.clear();
+  }
+
+  void _toggleTodo(Todo t, bool? value) {
+    setState(() {
+      t.done = value ?? false;
+    });
+  }
+
+  void _removeTodo(Todo t) {
+    setState(() {
+      _todos.remove(t);
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Widget _buildFilters() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: [
+          ChoiceChip(
+            label: const Text("All"),
+            selected: _filter == TodoFilter.all,
+            onSelected: (_) => setState(() => _filter = TodoFilter.all),
+          ),
+          ChoiceChip(
+            label: const Text("Done"),
+            selected: _filter == TodoFilter.done,
+            onSelected: (_) => setState(() => _filter = TodoFilter.done),
+          ),
+          ChoiceChip(
+            label: const Text("Undone"),
+            selected: _filter == TodoFilter.undone,
+            onSelected: (_) => setState(() => _filter = TodoFilter.undone),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
-    // Statisk lista som i figma
-    final todos = <_TodoRowData>[
-      _TodoRowData('Write a book', done: false),
-      _TodoRowData('Do homework', done: false),
-      _TodoRowData('Tidy room', done: true),
-      _TodoRowData('Watch TV', done: false),
-      _TodoRowData('Nap', done: false),
-      _TodoRowData('Shop groceries', done: false),
-      _TodoRowData('Have fun', done: false),
-      _TodoRowData('Meditate', done: false),
-    ];
+    final todos = _filtered;
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text(
-          'TIG333 TODO',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            color: Colors.black87, // ÄNDRING 1
-          ),
+        title: Text(
+          'TIG333 TODO  •  ${_todos.where((t) => t.done).length}/${_todos.length} done',
+          style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black87),
         ),
         centerTitle: true,
         backgroundColor: Colors.blueGrey.shade200,
       ),
-
       body: Column(
         children: [
-          // Filter-knappar
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                ChoiceChip(
-                  label: const Text("All"),
-                  selected: true,
-                  onSelected: null,
-                ),
-                ChoiceChip(
-                  label: const Text("Done"),
-                  selected: false,
-                  onSelected: null,
-                ),
-                ChoiceChip(
-                  label: const Text("Undone"),
-                  selected: false,
-                  onSelected: null,
-                ),
-              ],
-            ),
-          ),
-
+          _buildFilters(),
           const Divider(),
-
-          // Lista med todos
           Expanded(
             child: ListView.separated(
               itemCount: todos.length,
               separatorBuilder: (_, __) => const Divider(height: 1),
               itemBuilder: (context, index) {
-                final row = todos[index];
+                final t = todos[index];
                 return Container(
                   color: Colors.white,
                   child: ListTile(
                     leading: Checkbox(
-                      value: row.done,
-                      onChanged: null, // bara visuellt i steg 1
+                      value: t.done,
+                      onChanged: (v) => _toggleTodo(t, v),
                     ),
                     title: Text(
-                      row.title,
+                      t.title,
                       style: TextStyle(
                         fontSize: 18,
-                        decoration: row.done ? TextDecoration.lineThrough : null,
+                        decoration: t.done ? TextDecoration.lineThrough : null,
                       ),
                     ),
                     trailing: IconButton(
-                      onPressed: () {},
+                      tooltip: 'Delete',
+                      onPressed: () => _removeTodo(t),
                       icon: const Icon(Icons.close),
                     ),
                   ),
@@ -112,8 +169,7 @@ class TodoListScreen extends StatelessWidget {
               },
             ),
           ),
-
-          // Textfält + ADD-knapp längst ner
+          // Input + ADD
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             color: Colors.white,
@@ -121,8 +177,10 @@ class TodoListScreen extends StatelessWidget {
               children: [
                 Expanded(
                   child: TextField(
+                    controller: _controller,
+                    onSubmitted: (_) => _addTodo(), // Enter lägger till
                     decoration: InputDecoration(
-                      hintText: 'What needs to be done?', // ÄNDRING 2
+                      hintText: 'What needs to be done?',
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(6),
                       ),
@@ -135,11 +193,11 @@ class TodoListScreen extends StatelessWidget {
                 ),
                 const SizedBox(width: 8),
                 ElevatedButton.icon(
-                  onPressed: () {}, // ingen funktion ännu
+                  onPressed: _addTodo,
                   icon: const Icon(Icons.add),
                   label: const Text("ADD"),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blueGrey, // ÄNDRING 3
+                    backgroundColor: Colors.blueGrey,
                     padding: const EdgeInsets.symmetric(
                       horizontal: 16,
                       vertical: 14,
@@ -153,10 +211,4 @@ class TodoListScreen extends StatelessWidget {
       ),
     );
   }
-}
-
-class _TodoRowData {
-  final String title;
-  final bool done;
-  const _TodoRowData(this.title, {required this.done});
 }
